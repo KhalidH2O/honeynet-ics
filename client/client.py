@@ -1,4 +1,5 @@
 from pymodbus.client.tcp import ModbusTcpClient
+from time import sleep
 
 client = ModbusTcpClient(
     "localhost", port=5020
@@ -7,20 +8,32 @@ client = ModbusTcpClient(
 client.connect()
 
 class Client:
-    def __init__(self, address, count, device_id):
-        self.result = client.read_holding_registers(
-            address=address,
-            count=count,
-            device_id=device_id
-        )
+    def __init__(self, dev_id):
+        self.dev_id = dev_id
 
-PLC1 = Client(0,3,1)
-PLC2 = Client(0,3,2)
-PLC3 = Client(0,3,3)
+    def read_register(self):
+        self.result = client.read_holding_registers(
+            address=0,
+            count=2,
+            device_id=self.dev_id
+        )
+        return self.result.registers
+
+PLC1 = Client(1)
+PLC2 = Client(2)
+PLC3 = Client(3)
 
 clients = [PLC1, PLC2, PLC3]
 
 for c in clients:
-    print(c.result.registers)
+    print(c.read_register())
+sleep(11)
+
+PLC1 = Client(1)
+PLC2 = Client(2)
+PLC3 = Client(3)
+for c in clients:
+    print(c.read_register())
+
 
 client.close()
