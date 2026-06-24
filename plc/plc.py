@@ -1,10 +1,12 @@
 # #PLC Devices Simulation
 
 from pymodbus.simulator import SimData, SimDevice, DataType
-from pymodbus.server import StartTcpServer
+from pymodbus.server import ModbusTcpServer
+from pymodbus import FramerType
 
 from time import sleep
-from threading import Thread
+import asyncio
+
 import logging
 
 logging.basicConfig(
@@ -53,7 +55,7 @@ class Plant:
         self.tank3 = Tank(3,1200,1150,200,400,1)
 
         self.tanks = [self.tank1, self.tank2, self.tank3]
-
+        
     def update_flows(self):
         # Outflows
         self.T1_outflow = 0
@@ -90,35 +92,43 @@ class Plant:
         self.tank3.level += self.T3_inflow
         self.tank3.level -= self.T3_outflow
 
-    def update_plc(self):
-        for t in self.tanks:
-            t.device.simdata.values[0] = t.level
-            t.device.simdata.values[1] = t.pump
-
     def tick(self):
         for t in self.tanks:
             t.set_pump()
 
         self.update_flows()
         self.do_flows()
-        self.update_plc()
 
-    def process(self):
-        i=1
-        while True:
-            self.tick()
-            sleep(1)
-            i+=1
-            if i==10:
-                self.tank1.device.simdata.values[0] = 9999
+async def process(plant, server):
+    while True:
+        plant.tick()
 
-plant = Plant()
-# plant.tick()
-Thread(target=plant.process).start()
+        #update the server values
+        for tank in plant.tanks: 
+            await server.async_setValues(
+                device_id=tank.dev_id,
+                func_code=3,
+                address=0,
+                values=[tank.level, tank.pump])
 
-devices = [plant.tank1.device, plant.tank2.device, plant.tank3.device]
+        await asyncio.sleep(1)
+        print("Running process")
 
-StartTcpServer(
-    context=devices,
-    address=("0.0.0.0", 5020)
-)
+
+async def main():    
+    plant = Plant()
+
+    devices = [plant.tank1.device, plant.tank2.device, plant.tank3.device]
+
+    server = ModbusTcpServer(
+        context=devices,
+        framer=FramerType.SOCKET,        
+        address=("0.0.0.0", 5020)
+    )
+    
+    asyncio.create_task(process(plant, server))
+    
+    await server.serve_forever()
+
+if __name__ == "__main__":
+    asyncio.run(main())

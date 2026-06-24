@@ -25,15 +25,13 @@ PLC3 = Client(3)
 
 clients = [PLC1, PLC2, PLC3]
 
-for c in clients:
-    print(c.read_register())
-sleep(11)
+try:
+    while True:
 
-PLC1 = Client(1)
-PLC2 = Client(2)
-PLC3 = Client(3)
-for c in clients:
-    print(c.read_register())
+        for c in clients:
+            print(c.read_register())
+        sleep(1)
 
-
-client.close()
+except KeyboardInterrupt:
+    client.close()
+    print("\nClient connection closed!")
