@@ -9,7 +9,7 @@ import asyncio
 
 import logging
 
-from registers import Registers
+from .registers import Registers
 
 logging.basicConfig(
     level=logging.DEBUG
