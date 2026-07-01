@@ -101,12 +101,43 @@ def set_pump_mode():
             )
 
 def set_pump_cmd():
-    pass
+    # Set Pump ON/OFF
+    while True:
+        try:
+            print("Select the pump to turn ON/OFF:")
+            
+            for c in clients:
+                print(f"{c.dev_id}. Pump {c.dev_id}")
+            
+            pump_option = int(input())
 
-# client.write_registers(
-#     address=2,
-#     values=[1,0],
-#     device_id=2)
+            if not (0 < pump_option <= c.dev_id):
+                continue
+
+        except ValueError:
+            print("\nInvalid input!\n")
+            continue
+        else:
+            break
+        
+    pump_mode = client.read_holding_registers(
+        address=2,
+        count=1,
+        device_id=pump_option).registers[0]
+    
+    while True:
+        try:
+            print("Select Pump command:")
+            print("0. OFF")
+            print("1. ON")
+        
+        except ValueError:
+            print("\nInvalid input!\n")
+        
+        else:
+            break
+        
+
 
 def end_client():
     client.close()
