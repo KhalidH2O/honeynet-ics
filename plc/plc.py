@@ -49,7 +49,7 @@ class Tank:
         self.plc = PLC(dev_id)
         self.device = self.plc.PLC
 
-    def set_pump(self):
+    def set_pump(self, dev_id):
         # Automatic pump ON/OFF
         if (self.pump_mode == 0): 
             if (self.level <= self.min_level):
@@ -60,7 +60,7 @@ class Tank:
         # Manual pump operation
         else:
             self.pump = self.pump_manual
-            print("Pump override ON!")
+            print(f"Pump {dev_id} : Override ON!")
 
 class Plant:
     def __init__(self):
@@ -109,7 +109,7 @@ class Plant:
 
     def tick(self):
         for t in self.tanks:
-            t.set_pump()
+            t.set_pump(t.dev_id)
 
         self.update_flows()
         self.do_flows()
@@ -142,10 +142,12 @@ async def update_commands(plant, server):
             address=Registers.PUMP_MODE,
             count=2,
         )
-
+        
         # Store values in the tank process
         tank.pump_mode = values[0]
         tank.pump_manual = values[1]
+
+        print(f"Pump[Manual] {tank.dev_id} : {tank.pump_manual}")
 
 async def main():
     plant = Plant()

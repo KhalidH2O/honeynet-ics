@@ -75,7 +75,7 @@ def set_pump_mode():
     # Get Pump mode
     while True:    
         try:
-            print("Set Pump:")
+            print("\nSet Pump:")
             print("0. Automatic")
             print("1. Manual\n")
 
@@ -104,15 +104,26 @@ def set_pump_cmd():
     # Set Pump ON/OFF
     while True:
         try:
-            print("Select the pump to turn ON/OFF:")
+            print("\nSelect the pump to turn ON/OFF:")
             
             for c in clients:
                 print(f"{c.dev_id}. Pump {c.dev_id}")
             
+            print(" ")
             pump_option = int(input())
 
             if not (0 < pump_option <= c.dev_id):
                 continue
+
+            pump_mode = client.read_holding_registers(
+                address=2,
+                count=1,
+                device_id=pump_option).registers[0]
+        
+            if (pump_mode == 0):
+                print(f"\nPump {pump_option} is in AUTO mode!")
+                print("Set the pump to MANUAL mode to input commands...")
+                break
 
         except ValueError:
             print("\nInvalid input!\n")
@@ -120,24 +131,32 @@ def set_pump_cmd():
         else:
             break
         
-    pump_mode = client.read_holding_registers(
-        address=2,
-        count=1,
-        device_id=pump_option).registers[0]
-    
-    while True:
+    while (pump_mode):
         try:
-            print("Select Pump command:")
+            print("\nSelect Pump command:")
             print("0. OFF")
             print("1. ON")
-        
+            print(" ")
+
+            cmd_option = int(input())
+
+            if (cmd_option in [0,1]):
+                client.write_register(
+                    address=Registers.PUMP_MANUAL,
+                    value=cmd_option,
+                    device_id=pump_option
+                )
+                print(f"\nPump {pump_option} set to {cmd_option}!")
+                break
+
+            else:
+                continue
+
         except ValueError:
             print("\nInvalid input!\n")
         
         else:
             break
-        
-
 
 def end_client():
     client.close()
@@ -146,7 +165,7 @@ def end_client():
 
 while True:
     try:
-        print("=== SCADA ===")
+        print("\n=== SCADA ===")
         print("             ")
         print("1. Read Plant values")
         print("2. Set Pump AUTO/MANUAL")
