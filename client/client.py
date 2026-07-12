@@ -151,6 +151,10 @@ while True:
             case _:
                 print("\nInvalid Input!\n")
 
+    except ConnectionError as e:
+        print(f"\n{e}")
+        service.disconnect()
+
     except ValueError:
         print("\nInvalid Input!\n")
         continue

@@ -3,7 +3,7 @@ import asyncio
 import logging
 
 from .registers import Registers
-from services.Modbus_service import PLC, ModbusServer
+from modbus.server import PLC, ModbusServer
 
 logging.basicConfig(
     level=logging.DEBUG

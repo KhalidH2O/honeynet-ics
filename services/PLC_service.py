@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from pymodbus.client.tcp import ModbusTcpClient
 from plc.registers import Registers
+from pymodbus import exceptions
 
 @dataclass
 class PLCStatus:
@@ -42,12 +43,21 @@ class PLCService:
         return self.devices
 
     def read(self, device_id:int) -> PLCStatus:
-        values = self.client.read_holding_registers(
-            address=0,
-            count=4,
-            device_id=device_id
-        ).registers
+        try:
+            result = self.client.read_holding_registers(
+                address=0,
+                count=4,
+                device_id=device_id
+            )
+
+        except exceptions.ConnectionException as e:
+            raise ConnectionError("Connection to PLC server lost.") from e
         
+        if result.isError():
+            raise RuntimeError(result)
+        
+        values = result.registers
+
         return PLCStatus(
             id=device_id,
             name=self.devices[device_id],
@@ -63,8 +73,9 @@ class PLCService:
 
         for plc_id in self.devices:
             all_plcs.append(self.read(plc_id))
-
+        
         return all_plcs
+    
 
     def _write_registers(self, address:int, values:list, device_id:int):
         self.client.write_registers(
