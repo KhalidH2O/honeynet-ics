@@ -1,43 +1,25 @@
-import sys
 from time import sleep
+from services.PLC_service import PLCService
 
-from pymodbus.client.tcp import ModbusTcpClient
-from plc.registers import Registers
+service = PLCService()
 
-client = ModbusTcpClient(
-    "localhost", port=5020
-)
-
-class Client:
-    def __init__(self, dev_id):
-        self.dev_id = dev_id
-
-    def read_register(self):
-        self.result = client.read_holding_registers(
-            address=0,
-            count=4,
-            device_id=self.dev_id
-        )
-        return self.result.registers
-
-client.connect()
-
-PLC1 = Client(1)
-PLC2 = Client(2)
-PLC3 = Client(3)
-
-clients = [PLC1, PLC2, PLC3]
+try:
+    service.connect()
+except ConnectionError as e:
+    print(e)
+    exit(1)
 
 def read_plant():
     while True:
-        for c in clients:
-            values = c.read_register()
-            print(f"\n--- PLC {c.dev_id} ---")
-            print(f"Tank Level   : {values[Registers.LEVEL]}")
-            print(f"Pump State   : {values[Registers.PUMP]}")
-            print(f"Pump Mode    : {values[Registers.PUMP_MODE]}")
-            print(f"Pump Command : {values[Registers.PUMP_MANUAL]}")
-            print("\n")
+        plcs = service.read_all()
+
+        for plc in plcs:
+            print(f"\n--- PLC {plc.id} ---")
+            print(f"Tank Level   : {plc.level}")
+            print(f"Pump State   : {plc.pump}")
+            print(f"Pump Mode    : {plc.pump_mode}")
+            print(f"Pump Command : {plc.pump_manual}")
+        print("\n")
         print("-------------------------")
         print("Press Ctrl+C to exit...")
         print("-------------------------")
@@ -47,15 +29,16 @@ def set_pump_mode():
     # Pump Selection
     while True:
         try:
+            plcs = service.read_all()
             print("\nSelect the pump to set the mode:")
-            for c in clients:
-                print(f"{c.dev_id}. Pump {c.dev_id}")
+            for plc in plcs:
+                print(f"{plc.id}. Pump {plc.id}")
 
             print(" ")
             pump_option = int(input())
 
             # Pump selection validation
-            if not (0 < pump_option <= c.dev_id):
+            if not (0 < pump_option <= plc.id):
                 continue
 
         except ValueError:
@@ -64,13 +47,6 @@ def set_pump_mode():
 
         else:
             break
-    
-    # Get current Pump mode
-    current_mode = client.read_holding_registers(
-        address=2,
-        count=1,
-        device_id=pump_option
-        ).registers[0]
     
     # Get Pump mode
     while True:    
@@ -89,40 +65,38 @@ def set_pump_mode():
         
         else:
             break
+
+    # Get current Pump mode
+    current_mode = service.read(pump_option).pump_mode
     
     # Set Pump mode
     if (mode_option == current_mode):
         print(f"\nPump already set to {mode_option}!\n")
     else:
-        client.write_registers(
-            address=2,
-            values=[mode_option],
-            device_id=pump_option
-            )
+        service.set_mode(pump_option, mode_option)
 
 def set_pump_cmd():
     # Set Pump ON/OFF
     while True:
         try:
-            print("\nSelect the pump to turn ON/OFF:")
+            plcs = service.read_all()
             
-            for c in clients:
-                print(f"{c.dev_id}. Pump {c.dev_id}")
+            print("\nSelect the pump to turn ON/OFF:")
+            for plc in plcs:
+                print(f"{plc.id}. Pump {plc.id}")
             
             print(" ")
             pump_option = int(input())
 
-            if not (0 < pump_option <= c.dev_id):
+            if not (0 < pump_option <= plc.id):
                 continue
 
-            pump_mode = client.read_holding_registers(
-                address=2,
-                count=1,
-                device_id=pump_option).registers[0]
+            pump_mode = service.read(pump_option).pump_mode
         
             if (pump_mode == 0):
                 print(f"\nPump {pump_option} is in AUTO mode!")
                 print("Set the pump to MANUAL mode to input commands...")
+                
                 break
 
         except ValueError:
@@ -135,18 +109,14 @@ def set_pump_cmd():
         try:
             print("\nSelect Pump command:")
             print("0. OFF")
-            print("1. ON")
-            print(" ")
+            print("1. ON\n")
 
             cmd_option = int(input())
 
             if (cmd_option in [0,1]):
-                client.write_register(
-                    address=Registers.PUMP_MANUAL,
-                    value=cmd_option,
-                    device_id=pump_option
-                )
+                service.set_pump_cmd(pump_option, cmd_option)
                 print(f"\nPump {pump_option} set to {cmd_option}!")
+                
                 break
 
             else:
@@ -157,11 +127,6 @@ def set_pump_cmd():
         
         else:
             break
-
-def end_client():
-    client.close()
-    print("\nClient connection closed!")
-    sys.exit(0)
 
 while True:
     try:
@@ -182,7 +147,7 @@ while True:
             case 3:
                 set_pump_cmd()
             case 4:
-                end_client()
+                service.disconnect()
             case _:
                 print("\nInvalid Input!\n")
 
@@ -191,4 +156,4 @@ while True:
         continue
 
     except KeyboardInterrupt:
-        end_client()
+        service.disconnect()

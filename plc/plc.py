@@ -1,34 +1,13 @@
 # #PLC Devices Simulation
-
-from pymodbus.simulator import SimData, SimDevice, DataType
-from pymodbus.server import ModbusTcpServer
-from pymodbus import FramerType
-
-from time import sleep
 import asyncio
-
 import logging
 
 from .registers import Registers
+from services.Modbus_service import PLC, ModbusServer
 
 logging.basicConfig(
     level=logging.DEBUG
 )
-
-class PLC:
-    def __init__(self, dev_id):
-        self.PLC_data = SimData(
-            address=0,
-            count=4,
-            values=[0,0,0,0],
-            datatype=DataType.REGISTERS
-        )
-        # values = [level, auto_pump, pump_mode, manual_pump]
-
-        self.PLC = SimDevice(
-            id=dev_id,
-            simdata=self.PLC_data
-        )
         
 class Tank:
     def __init__(self, dev_id, capacity, max_level, min_level, level, pump):
@@ -39,7 +18,7 @@ class Tank:
         self.max_level = max_level
         self.min_level = min_level
 
-        #Dynamic values
+        # Dynamic values
         self.level = level
         self.pump = pump
         self.pump_mode = 0
@@ -114,7 +93,7 @@ class Plant:
         self.update_flows()
         self.do_flows()
 
-async def process(plant, server):
+async def process(plant:Plant, server:ModbusServer):
     while True:
         # Read the client commands and store them in datastore
         await update_commands(plant, server)
@@ -122,30 +101,20 @@ async def process(plant, server):
         plant.tick()
 
         #update the server values
-        for tank in plant.tanks: 
-            await server.async_setValues(
-                device_id=tank.dev_id,
-                func_code=3,
-                address=Registers.LEVEL,
-                values=[tank.level, tank.pump, tank.pump_mode, tank.pump_manual])
+        for tank in plant.tanks:
+            await server.set_values(tank)
 
         await asyncio.sleep(1)
         print("Running process")
 
-async def update_commands(plant, server):
-    
+async def update_commands(plant:Plant, server:ModbusServer):
     # Get pump values from server datastore
     for tank in plant.tanks:
-        values = await server.async_getValues(
-            device_id=tank.dev_id,
-            func_code=3,
-            address=Registers.PUMP_MODE,
-            count=2,
-        )
+        values = await server.get_values(tank.dev_id) #Edit
         
         # Store values in the tank process
-        tank.pump_mode = values[0]
-        tank.pump_manual = values[1]
+        tank.pump_mode = values[Registers.PUMP_MODE]
+        tank.pump_manual = values[Registers.PUMP_MANUAL]
 
         print(f"Pump[Manual] {tank.dev_id} : {tank.pump_manual}")
 
@@ -154,15 +123,11 @@ async def main():
 
     devices = [plant.tank1.device, plant.tank2.device, plant.tank3.device]
 
-    server = ModbusTcpServer(
-        context=devices,
-        framer=FramerType.SOCKET,        
-        address=("0.0.0.0", 5020)
-    )
+    server = ModbusServer(devices)
 
     asyncio.create_task(process(plant, server))
     
-    await server.serve_forever()
+    await server.serve()
     
 if __name__ == "__main__":
     asyncio.run(main())
